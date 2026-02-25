@@ -1,0 +1,11 @@
+# Build artifacts
+.build/
+Packages/
+.vapor/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# macOS
+.DS_Store
+
+# SQLite database
+*.sqlite
