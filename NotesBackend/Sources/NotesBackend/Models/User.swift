@@ -2,7 +2,7 @@ import Vapor
 import Fluent
 import struct Foundation.UUID
 
-final class User: Model, @unchecked Sendable {
+final class User: Model, Content, @unchecked Sendable {
     static let schema = "users"
 
     @ID(key: .id)
