@@ -18,7 +18,12 @@ final class Note: Model, Content, @unchecked Sendable {
 
     init() {}
 
-    init(id: UUID? = nil, title: String, content: String, userID: UUID) {
+    init(
+        id: UUID? = nil,
+        title: String,
+        content: String,
+        userID: UUID
+    ) {
         self.id = id
         self.title = title
         self.content = content
