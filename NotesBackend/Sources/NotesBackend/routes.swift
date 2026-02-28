@@ -13,7 +13,6 @@ func routes(_ app: Application) throws {
     }
 
     // get all notes for current user
-    // /getNotes/userID:UUID
     app.get("getNotes", ":userID") { request -> EventLoopFuture<[Note]> in
         guard let userID = request.parameters.get("userID", as: UUID.self) else {
             throw Abort(.badRequest, reason: "Missing or invalid userID")
@@ -26,25 +25,52 @@ func routes(_ app: Application) throws {
 
     // get all notes in db
     app.get("getAllNotes") { request -> EventLoopFuture<[Note]> in
-        return Note.query(on: request.db).all()
+        guard let idString = request.headers.first(name: "X-User-ID"),
+              let uuid = UUID(uuidString: idString)
+        else {
+            throw Abort(.unauthorized)
+        }
+
+        return User.find(uuid, on: request.db)
+            .unwrap(or: Abort(.unauthorized))
+            .flatMap { user in
+                guard user.role == .admin || user.role == .moderator else {
+                    return request.eventLoop.makeFailedFuture(Abort(.forbidden))
+                }
+
+                return Note.query(on: request.db).all()
+            }
     }
 
-    // edit note by id (overwrite title/content only)
-    app.put("editNote", ":noteID") { request -> EventLoopFuture<Note> in
+    // edit note by id
+    app.put("editNote", ":noteID") { request async throws -> Note in
+
         let updatedDTO = try request.content.decode(NoteDTO.self)
 
         guard let noteID = request.parameters.get("noteID", as: UUID.self) else {
-            throw Abort(.badRequest, reason: "Missing or invalid noteID")
+            throw Abort(.badRequest)
         }
 
-        return Note.find(noteID, on: request.db)
-            .unwrap(or: Abort(.notFound))
-            .flatMap { note in
-                note.title = updatedDTO.title
-                note.content = updatedDTO.content
+        guard let idString = request.headers.first(name: "X-User-ID"),
+              let uuid = UUID(uuidString: idString),
+              let user = try await User.find(uuid, on: request.db)
+        else {
+            throw Abort(.unauthorized)
+        }
 
-                return note.save(on: request.db).map { note }
-            }
+        guard user.role == .admin || user.role == .moderator else {
+            throw Abort(.forbidden)
+        }
+
+        guard let note = try await Note.find(noteID, on: request.db) else {
+            throw Abort(.notFound)
+        }
+
+        note.title = updatedDTO.title
+        note.content = updatedDTO.content
+
+        try await note.save(on: request.db)
+        return note
     }
 
     // delete note by id
@@ -53,11 +79,73 @@ func routes(_ app: Application) throws {
             throw Abort(.badRequest, reason: "Missing or invalid noteID")
         }
 
+        guard let idString = request.headers.first(name: "X-User-ID"),
+              let uuid = UUID(uuidString: idString)
+        else {
+            throw Abort(.unauthorized)
+        }
+
         let noteToDelete = Note.find(noteID, on: request.db).unwrap(or: Abort(.notFound))
 
-        return noteToDelete.flatMap { note in
-            note.delete(on: request.db).map { note }
+        return User.find(uuid, on: request.db)
+            .unwrap(or: Abort(.unauthorized))
+            .flatMap { user in
+                guard user.role == .admin else {
+                    return request.eventLoop.makeFailedFuture(Abort(.forbidden))
+                }
+
+                return noteToDelete.flatMap { note in
+                    note.delete(on: request.db).map { note }
+                }
+            }
+    }
+
+    // MARK: - Users routes
+
+    // registration
+    app.post("register") { request async throws -> String in
+        let data = try request.content.decode(RegistrationUserDTO.self)
+
+        let count = try await User.query(on: request.db).count()
+        var role: UserRole = .user
+
+        if count == 0 {
+            role = .admin
+        } else if count == 1 {
+            role = .moderator
         }
+
+        let hash = try Bcrypt.hash(data.password)
+
+        let user = User(
+            login: data.login,
+            role: role,
+            passwordHash: hash
+        )
+
+        try await user.save(on: request.db)
+        return role.rawValue
+    }
+
+    // login
+    app.post("login") { request -> EventLoopFuture<LoginResponceUserDTO> in
+        let data = try request.content.decode(LoginUserDTO.self)
+
+        return User.query(on: request.db)
+            .filter(\.$login == data.login)
+            .first()
+            .unwrap(or: Abort(.unauthorized))
+            .flatMapThrowing { user in
+
+                if try Bcrypt.verify(data.password, created: user.passwordHash) {
+                    return LoginResponceUserDTO(
+                        login: user.login,
+                        role: user.role.rawValue
+                    )
+                } else {
+                    throw Abort(.unauthorized)
+                }
+            }
     }
 }
 
@@ -75,4 +163,19 @@ func routes(_ app: Application) throws {
 
 
  curl -X DELETE http://localhost:8080/deleteNote/UUID_ЗАМЕТКИ
+
+ curl -X POST http://localhost:8080/register \
+ -H "Content-Type: application/json" \
+ -d '{"login":"moder","password":"moder"}'
+
+ curl -X POST http://localhost:8080/register \
+ -H "Content-Type: application/json" \
+ -d '{"login":"admin","password":"admin"}'
+
+
+ curl -X POST http://localhost:8080/login \
+ -H "Content-Type: application/json" \
+ -d '{"login":"admin","password":"admin"}'
+
+ // данные для входа в админскую версию - admin admin
  */
