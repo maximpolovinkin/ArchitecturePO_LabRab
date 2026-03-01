@@ -103,7 +103,7 @@ func routes(_ app: Application) throws {
     // MARK: - Users routes
 
     // registration
-    app.post("register") { request async throws -> String in
+    app.post("register") { request async throws -> RegisterResponceUserDTO in
         let data = try request.content.decode(RegistrationUserDTO.self)
 
         let count = try await User.query(on: request.db).count()
@@ -124,7 +124,12 @@ func routes(_ app: Application) throws {
         )
 
         try await user.save(on: request.db)
-        return role.rawValue
+
+        guard let id = user.id else {
+            throw Abort(.internalServerError, reason: "Failed to create user id")
+        }
+
+        return RegisterResponceUserDTO(id: id, role: role)
     }
 
     // login
@@ -137,9 +142,10 @@ func routes(_ app: Application) throws {
             .unwrap(or: Abort(.unauthorized))
             .flatMapThrowing { user in
 
-                if try Bcrypt.verify(data.password, created: user.passwordHash) {
+                if try Bcrypt.verify(data.password, created: user.passwordHash),
+                let id = user.id {
                     return LoginResponceUserDTO(
-                        login: user.login,
+                        id: id,
                         role: user.role.rawValue
                     )
                 } else {

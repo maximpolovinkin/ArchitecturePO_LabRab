@@ -6,8 +6,9 @@
 //
 
 import Vapor
+import Foundation
 
 struct LoginResponceUserDTO: Content {
-    let login: String
+    let id: UUID
     let role: String
 }
