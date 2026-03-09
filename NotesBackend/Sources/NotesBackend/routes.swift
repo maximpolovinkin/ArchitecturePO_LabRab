@@ -1,5 +1,6 @@
 import Fluent
 import Vapor
+import CryptoKit
 
 func routes(_ app: Application) throws {
 
@@ -143,7 +144,7 @@ func routes(_ app: Application) throws {
             .flatMapThrowing { user in
 
                 if try Bcrypt.verify(data.password, created: user.passwordHash),
-                let id = user.id {
+                   let id = user.id {
                     return LoginResponceUserDTO(
                         id: id,
                         role: user.role.rawValue
@@ -153,8 +154,43 @@ func routes(_ app: Application) throws {
                 }
             }
     }
+
+    // verify signature_1
+    app.post("verify") { req async throws -> VerifyResponse in
+
+        let data = try req.content.decode(VerifyRequest.self)
+
+        let valid = try verifySignature(
+            message: data.message,
+            signatureBase64: data.signature,
+            publicKeyBase64: data.publicKey
+        )
+
+        return VerifyResponse(valid: valid)
+    }
 }
 
+func verifySignature(
+    message: String,
+    signatureBase64: String,
+    publicKeyBase64: String
+) throws -> Bool {
+
+    let messageData = Data(message.utf8)
+
+    guard
+        let signatureData = Data(base64Encoded: signatureBase64),
+        let publicKeyData = Data(base64Encoded: publicKeyBase64)
+    else {
+        return false
+    }
+
+    let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData)
+    return publicKey.isValidSignature(
+        signatureData,
+        for: messageData
+    )
+}
 
 /*
  curl http://localhost:8080/getNotes/userID:UUID_СУЩЕСТВУЮЩЕГО_ЮЗЕРА

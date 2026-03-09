@@ -17,13 +17,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
-        let processor = RequestProcessor<User>()
-        let service = AutorisationService(requestProcessor: processor)
-        let presenter = AutorisationPresenter(autorisationService: service)
-        let rootVC = AutorisationViewController(presenter: presenter)
+        let rootVC = MainViewController()
+        let navigationController = UINavigationController(rootViewController: rootVC)
 
         let window = UIWindow()
-        window.rootViewController = rootVC
+        window.rootViewController = navigationController
         window.makeKeyAndVisible()
 
         self.window = window

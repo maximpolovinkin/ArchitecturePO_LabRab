@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "NotesBackend",
     platforms: [
-       .macOS(.v13)
+        .macOS(.v10_15)
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
