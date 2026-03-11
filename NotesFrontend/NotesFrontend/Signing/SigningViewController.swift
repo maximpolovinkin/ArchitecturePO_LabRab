@@ -7,12 +7,17 @@
 
 import UIKit
 
+protocol ISigningView: NSObject {
+    func showAlert(title: String, message: String)
+}
+
 final class SigningViewController: UIViewController {
 
     // Components
     private let textField = UITextField()
-    private let button = UIButton(type: .system)
+    private let signAndSendButton = UIButton(type: .system)
     private let resultLabel = UILabel()
+    private let reciveButton = UIButton(type: .system)
 
     // Dependencies
     private let presenter: ISigningPresenter
@@ -41,8 +46,9 @@ final class SigningViewController: UIViewController {
 
     private func setupUI() {
         setupTextField()
-        setupButton()
+        setupSignAndSendButton()
         setupLabel()
+        setupReciveButton()
         setupStack()
     }
 
@@ -51,11 +57,11 @@ final class SigningViewController: UIViewController {
         textField.borderStyle = .roundedRect
     }
 
-    private func setupButton() {
-        button.setTitle("Подписать и отправить", for: .normal)
-        button.configuration = .glass()
-        button.backgroundColor = .systemMint
-        button.addTarget(self, action: #selector(onButtonTap), for: .touchUpInside)
+    private func setupSignAndSendButton() {
+        signAndSendButton.setTitle("Подписать и отправить", for: .normal)
+        signAndSendButton.configuration = .glass()
+        signAndSendButton.backgroundColor = .systemMint
+        signAndSendButton.addTarget(self, action: #selector(onSignAndSendButtonTap), for: .touchUpInside)
     }
 
     private func setupLabel() {
@@ -64,11 +70,19 @@ final class SigningViewController: UIViewController {
         resultLabel.numberOfLines = 0
     }
 
+    private func setupReciveButton() {
+        reciveButton.setTitle("Получить сообщение и проверить подпись", for: .normal)
+        reciveButton.configuration = .glass()
+        reciveButton.backgroundColor = .systemIndigo
+        reciveButton.addTarget(self, action: #selector(onReciveButtonTap), for: .touchUpInside)
+    }
+
     private func setupStack() {
         let stack = UIStackView(arrangedSubviews: [
             textField,
-            button,
-            resultLabel
+            signAndSendButton,
+            resultLabel,
+            reciveButton
         ])
         stack.axis = .vertical
         stack.spacing = 20
@@ -83,15 +97,9 @@ final class SigningViewController: UIViewController {
         ])
     }
 
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(.init(title: "Ок", style: .default))
-        present(alert, animated: true)
-    }
-
     // MARK: - Actions
 
-    @objc private func onButtonTap() {
+    @objc private func onSignAndSendButtonTap() {
         guard let message = textField.text, !message.isEmpty else {
             showAlert(title: "Ошибка", message: "Введите сообщение перед отправкой.")
             return
@@ -113,5 +121,16 @@ final class SigningViewController: UIViewController {
             }
         )
     }
+
+    @objc private func onReciveButtonTap() {
+        presenter.getMessageAndValidate()
+    }
 }
 
+extension SigningViewController: ISigningView {
+    func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(.init(title: "Ок", style: .default))
+        present(alert, animated: true)
+    }
+}

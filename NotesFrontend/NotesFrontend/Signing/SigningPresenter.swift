@@ -14,6 +14,8 @@ protocol ISigningPresenter {
         onResult: @escaping (Bool) -> Void,
         onError: @escaping (NSError) -> Void
     )
+
+    func getMessageAndValidate()
 }
 
 final class SigningPresenter: ISigningPresenter {
@@ -21,6 +23,8 @@ final class SigningPresenter: ISigningPresenter {
     // Dependencies
     private let dataSource: ISigningDataSource
     private let privateKey: Curve25519.Signing.PrivateKey = .init()
+//    private let publicKey: String
+    weak var view: ISigningView?
 
     // MARK: - Initialization
 
@@ -66,5 +70,60 @@ final class SigningPresenter: ISigningPresenter {
         } catch {
             onError(error as NSError)
         }
+    }
+
+    func getMessageAndValidate() {
+        dataSource.getPublicKey { result in
+            switch result {
+                case let .success(publicKeyResponce):
+                self.dataSource.getMessage { result in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case let .success(data):
+                            do {
+                                let isValid = try self.verifySignature(
+                                    message: data.message,
+                                    signatureBase64: data.signature,
+                                    publicKeyBase64: publicKeyResponce.publicKey
+                                )
+                                let title = isValid ? "Подпись верна" : "Подпись не верна"
+                                self.view?.showAlert(title: title, message: data.message)
+                            }
+                            catch {
+                                print(error)
+                            }
+                        case let .failure(error):
+                            print(error)
+                        }
+                    }
+                }
+                case let .failure(error):
+                   print(error)
+            }
+        }
+    }
+
+    // MARK: - Private
+
+    private func verifySignature(
+        message: String,
+        signatureBase64: String,
+        publicKeyBase64: String
+    ) throws -> Bool {
+
+        let messageData = Data(message.utf8)
+
+        guard
+            let signatureData = Data(base64Encoded: signatureBase64),
+            let publicKeyData = Data(base64Encoded: publicKeyBase64)
+        else {
+            return false
+        }
+
+        let publicKey = try Curve25519.Signing.PublicKey(rawRepresentation: publicKeyData)
+        return publicKey.isValidSignature(
+            signatureData,
+            for: messageData
+        )
     }
 }

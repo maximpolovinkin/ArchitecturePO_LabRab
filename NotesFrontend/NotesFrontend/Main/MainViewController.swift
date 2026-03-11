@@ -93,9 +93,19 @@ final class MainViewController: UIViewController {
 
     private func makeSigningViewController() -> SigningViewController {
         let processor = RequestProcessor<VerifyResponse>()
-        let dataSource = SigningDataSource(processor: processor)
+        let getMessageProcessor = RequestProcessor<GetMessageResponce>()
+        let publicKeyProcessor = RequestProcessor<PublicKeyResponse>()
+        let dataSource = SigningDataSource(
+            processor: processor,
+            getMessageProcessor: getMessageProcessor,
+            publicKeyProcessor: publicKeyProcessor
+        )
         let presenter = SigningPresenter(dataSource: dataSource)
-        return SigningViewController(presenter: presenter)
+        let controller = SigningViewController(presenter: presenter)
+
+        presenter.view = controller
+
+        return controller
     }
 }
 

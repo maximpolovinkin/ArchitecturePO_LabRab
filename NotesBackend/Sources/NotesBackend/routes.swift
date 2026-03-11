@@ -168,6 +168,27 @@ func routes(_ app: Application) throws {
 
         return VerifyResponse(valid: valid)
     }
+
+    app.get("publicKey") { req -> PublicKeyResponse in
+        let keys = req.application.storage[KeyServiceKey.self]!
+
+        return PublicKeyResponse(publicKey: keys.publicKey.rawRepresentation.base64EncodedString())
+    }
+
+    app.get("signedMessage") { req -> SignedResponse in
+
+        let keys = req.application.storage[KeyServiceKey.self]!
+
+        let message = "Hello World! number \(Int.random(in: 0...100))"
+        let messageData = Data(message.utf8)
+
+        let signature = try keys.privateKey.signature(for: messageData)
+
+        return SignedResponse(
+            message: message,
+            signature: signature.base64EncodedString()
+        )
+    }
 }
 
 func verifySignature(
